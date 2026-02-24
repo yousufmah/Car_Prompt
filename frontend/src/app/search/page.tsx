@@ -112,9 +112,10 @@ function SearchContent() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {results?.results.map((car) => (
-              <div
+              <Link
                 key={car.id}
-                className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden hover:border-gray-600 transition-colors"
+                href={`/listing/${car.id}`}
+                className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden hover:border-blue-500 transition-colors block"
               >
                 {/* Placeholder image */}
                 <div className="h-48 bg-gray-800 flex items-center justify-center text-4xl">
@@ -143,7 +144,7 @@ function SearchContent() {
                     <p className="text-xs text-gray-500 mt-2">📍 {car.location}</p>
                   )}
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}
