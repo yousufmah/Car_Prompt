@@ -115,7 +115,8 @@ Car_Prompt/
 │       └── listing/[id]/    # Individual listing
 ├── docs/
 │   └── PLAN.md              # Full product roadmap
-└── docker-compose.yml       # PostgreSQL + pgvector
+├── docker-compose.yml       # PostgreSQL + pgvector
+└── backend/tests/           # API tests (pytest)
 ```
 
 ---
@@ -139,6 +140,20 @@ See [`docs/PLAN.md`](docs/PLAN.md) for the full roadmap.
 - [ ] Conversational refinement
 
 ---
+
+## Testing
+
+API tests are available in the `backend/tests/` directory. To run tests:
+
+```bash
+cd backend
+# Install test dependencies
+pip install -r requirements-test.txt
+# Run tests
+pytest tests/ -v
+```
+
+See [`backend/tests/README.md`](backend/tests/README.md) for detailed test documentation.
 
 ## Contributing
 
