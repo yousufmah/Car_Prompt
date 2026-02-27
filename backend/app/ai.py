@@ -39,6 +39,12 @@ Always return valid JSON only. No explanation."""
 
 async def parse_prompt(user_prompt: str) -> dict:
     """Parse a natural language car search into structured filters."""
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key or api_key == "mock":
+        # Mock mode: return empty filters (still allows filter‑based search)
+        print("⚠️  OpenAI API key not set — using mock parser")
+        return {}
+
     response = await client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
