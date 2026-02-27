@@ -34,22 +34,33 @@ function SearchContent() {
   const [newPrompt, setNewPrompt] = useState(query);
 
   useEffect(() => {
-    if (query) {
-      setLoading(true);
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/search/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: query }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
+    if (!query) return;
+
+    let isMounted = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/search/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: query }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted) {
           setResults(data);
           setLoading(false);
-        })
-        .catch(() => {
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
           setLoading(false);
-        });
-    }
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [query]);
 
   return (

@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import search, listings, garages, search_advanced
+from datetime import datetime
 
 app = FastAPI(title="Car Prompt API", version="0.2.0")
 
@@ -21,3 +22,8 @@ app.include_router(garages.router, prefix="/api/garages", tags=["garages"])
 @app.get("/")
 async def root():
     return {"message": "Car Prompt API", "version": "0.2.0"}
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}

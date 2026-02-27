@@ -15,6 +15,19 @@ AI-powered car search. Describe your perfect car in plain English — CarPrompt 
 | Database | PostgreSQL + pgvector |
 | AI | OpenAI (gpt-4o-mini + text-embedding-ada-002) |
 | Hosting | Vercel (frontend) + Railway (backend + DB) |
+| Domain  | carprompt.co.uk |
+
+---
+
+## Production Deployment
+
+Domain `carprompt.co.uk` acquired 2026‑02‑27. For detailed deployment instructions, see [DEPLOY.md](DEPLOY.md).
+
+Quick steps:
+1. Deploy frontend to Vercel, connect domain
+2. Deploy backend + database to Railway
+3. Set DNS records at registrar
+4. Set up email forwarding (e.g., hello@carprompt.co.uk)
 
 ---
 
