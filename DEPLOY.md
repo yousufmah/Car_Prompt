@@ -38,6 +38,7 @@ In Vercel project settings > Domains, add `carprompt.co.uk` and `www.carprompt.c
 Set the following in Railway dashboard:
 - `DATABASE_URL`: PostgreSQL connection string (auto‑provisioned)
 - `OPENAI_API_KEY`: Your OpenAI‑compatible API key (DeepSeek recommended)
+  - If you don't have a key yet, set `OPENAI_API_KEY=mock` — filter‑based search will work, semantic search disabled
 - `OPENAI_API_BASE`: https://api.deepseek.com (if using DeepSeek)
 
 ### Database
