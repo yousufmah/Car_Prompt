@@ -12,7 +12,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Client will be initialized lazily only when a real API key is present
+_client: Optional[AsyncOpenAI] = None
+
+def _get_client() -> Optional[AsyncOpenAI]:
+    """Get OpenAI client if API key is valid, otherwise None."""
+    global _client
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key or api_key == "mock":
+        return None
+    if _client is None:
+        _client = AsyncOpenAI(api_key=api_key)
+    return _client
 
 IMPROVED_PARSE_SYSTEM_PROMPT = """You are an expert car search assistant with deep knowledge of automotive markets, 
 consumer preferences, and practical car-buying considerations.
@@ -114,6 +125,11 @@ Always return valid JSON only. No explanation. Use current year 2026 as referenc
 
 async def parse_prompt_improved(user_prompt: str) -> Dict[str, Any]:
     """Parse natural language car search with improved understanding."""
+    client = _get_client()
+    if client is None:
+        print("⚠️  OpenAI API key not set — using basic parser")
+        return await parse_prompt_basic(user_prompt)
+    
     try:
         response = await client.chat.completions.create(
             model="gpt-4o-mini",  # Consider gpt-4o for better understanding
@@ -227,6 +243,12 @@ def _post_process_filters(filters: Dict[str, Any]) -> Dict[str, Any]:
 
 async def get_contextual_embedding(text: str, context: str = "car_search") -> List[float]:
     """Generate embedding with context awareness."""
+    client = _get_client()
+    if client is None:
+        # Mock embedding: return zeros (dimension 1536 for ada‑002)
+        print("⚠️  OpenAI API key not set — using mock embedding")
+        return [0.0] * 1536
+    
     # For car search, we might want to prepend context
     if context == "car_search":
         text = f"car vehicle automobile search: {text}"
@@ -242,6 +264,11 @@ async def get_contextual_embedding(text: str, context: str = "car_search") -> Li
 
 async def expand_query_with_similar_terms(query: str) -> List[str]:
     """Use LLM to expand query with similar/relevant terms."""
+    client = _get_client()
+    if client is None:
+        print("⚠️  OpenAI API key not set — skipping query expansion")
+        return [query]
+    
     try:
         expansion_prompt = f"""
         Given the car search query: "{query}"
