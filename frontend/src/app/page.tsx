@@ -26,10 +26,10 @@ export default function Home() {
     <main className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col items-center justify-center px-4">
       {/* Hero */}
       <div className="text-center mb-12">
-        <h1 className="text-6xl font-bold text-white mb-4">
+        <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">
           Car<span className="text-blue-500">Prompt</span>
         </h1>
-        <p className="text-xl text-gray-400 max-w-xl">
+        <p className="text-lg md:text-xl text-gray-400 max-w-xl">
           Describe your perfect car. Our AI finds it for you.
         </p>
       </div>
@@ -42,11 +42,11 @@ export default function Home() {
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Describe your ideal car..."
-            className="w-full px-6 py-4 text-lg bg-gray-800 text-white rounded-2xl border border-gray-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder-gray-500"
+            className="w-full pl-4 md:pl-6 pr-20 sm:pr-24 py-4 text-base md:text-lg bg-gray-800 text-white rounded-2xl border border-gray-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all placeholder-gray-500"
           />
           <button
             type="submit"
-            className="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-xl font-semibold transition-colors"
+            className="absolute right-1 sm:right-2 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-3 sm:px-6 sm:py-2 rounded-xl font-semibold transition-colors"
           >
             Search
           </button>
@@ -59,7 +59,7 @@ export default function Home() {
           <button
             key={example}
             onClick={() => setPrompt(example)}
-            className="px-4 py-2 bg-gray-800/50 text-gray-400 rounded-full text-sm hover:bg-gray-700 hover:text-white transition-all border border-gray-700/50"
+            className="px-3 py-1.5 md:px-4 md:py-2 bg-gray-800/50 text-gray-400 rounded-full text-xs md:text-sm hover:bg-gray-700 hover:text-white transition-all border border-gray-700/50"
           >
             {example}
           </button>
@@ -67,7 +67,7 @@ export default function Home() {
       </div>
 
       {/* Stats / Trust bar */}
-      <div className="mt-16 flex gap-8 text-gray-500 text-sm">
+      <div className="mt-16 flex flex-col md:flex-row gap-4 md:gap-8 text-gray-500 text-sm">
         <span>🚗 10,000+ listings</span>
         <span>🏪 500+ garages</span>
         <span>🤖 AI-powered search</span>

@@ -66,9 +66,9 @@ function SearchContent() {
   return (
     <main className="min-h-screen bg-gray-950 text-white">
       {/* Header */}
-      <header className="border-b border-gray-800 px-6 py-4">
-        <div className="max-w-6xl mx-auto flex items-center gap-4">
-          <Link href="/" className="text-2xl font-bold">
+      <header className="border-b border-gray-800 px-4 sm:px-6 py-4">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center gap-4">
+          <Link href="/" className="text-xl sm:text-2xl font-bold">
             Car<span className="text-blue-500">Prompt</span>
           </Link>
           <form
@@ -117,7 +117,7 @@ function SearchContent() {
           </div>
         ) : results?.results.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-2xl mb-2">😢 No matches found</p>
+            <p className="text-xl sm:text-2xl mb-2">😢 No matches found</p>
             <p className="text-gray-400">Try adjusting your search</p>
           </div>
         ) : (
@@ -129,12 +129,12 @@ function SearchContent() {
                 className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden hover:border-blue-500 transition-colors block"
               >
                 {/* Placeholder image */}
-                <div className="h-48 bg-gray-800 flex items-center justify-center text-4xl">
+                <div className="h-32 sm:h-48 bg-gray-800 flex items-center justify-center text-2xl sm:text-4xl">
                   🚗
                 </div>
                 <div className="p-4">
-                  <h3 className="font-semibold text-lg">{car.title}</h3>
-                  <p className="text-2xl font-bold text-blue-400 mt-1">
+                  <h3 className="font-semibold text-base sm:text-lg">{car.title}</h3>
+                  <p className="text-xl sm:text-2xl font-bold text-blue-400 mt-1">
                     £{car.price.toLocaleString()}
                   </p>
                   <div className="flex flex-wrap gap-2 mt-3 text-xs text-gray-400">
