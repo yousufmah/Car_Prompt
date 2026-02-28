@@ -84,7 +84,7 @@ function SearchContent() {
               type="text"
               value={newPrompt}
               onChange={(e) => setNewPrompt(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-800 rounded-xl border border-gray-700 focus:border-blue-500 outline-none text-sm"
+              className="w-full px-4 py-3 sm:py-2 bg-gray-800 rounded-xl border border-gray-700 focus:border-blue-500 outline-none text-base sm:text-sm"
               placeholder="Refine your search..."
             />
           </form>
