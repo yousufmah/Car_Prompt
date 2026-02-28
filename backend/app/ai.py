@@ -2,12 +2,24 @@
 
 import json
 import os
+from typing import Optional
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
 
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Client will be initialized lazily only when a real API key is present
+_client: Optional[AsyncOpenAI] = None
+
+def _get_client() -> Optional[AsyncOpenAI]:
+    """Get OpenAI client if API key is valid, otherwise None."""
+    global _client
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key or api_key == "mock":
+        return None
+    if _client is None:
+        _client = AsyncOpenAI(api_key=api_key)
+    return _client
 
 PARSE_SYSTEM_PROMPT = """You are a car search assistant. Parse the user's natural language car query into structured filters.
 
@@ -39,8 +51,8 @@ Always return valid JSON only. No explanation."""
 
 async def parse_prompt(user_prompt: str) -> dict:
     """Parse a natural language car search into structured filters."""
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key or api_key == "mock":
+    client = _get_client()
+    if client is None:
         # Mock mode: return empty filters (still allows filter‑based search)
         print("⚠️  OpenAI API key not set — using mock parser")
         return {}
@@ -59,6 +71,12 @@ async def parse_prompt(user_prompt: str) -> dict:
 
 async def get_embedding(text: str) -> list[float]:
     """Generate an embedding vector for semantic search."""
+    client = _get_client()
+    if client is None:
+        # Mock embedding: return zeros (dimension 1536 for ada‑002)
+        print("⚠️  OpenAI API key not set — using mock embedding")
+        return [0.0] * 1536
+
     response = await client.embeddings.create(
         model="text-embedding-ada-002",
         input=text,
