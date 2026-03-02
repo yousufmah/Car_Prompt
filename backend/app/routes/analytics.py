@@ -18,6 +18,11 @@ USE_MOCK = True
 router = APIRouter()
 
 
+@router.get("/")
+async def analytics_root():
+    return {"message": "Analytics endpoints are working", "mock": USE_MOCK}
+
+
 class DateMetric(BaseModel):
     date: str
     impressions: int
