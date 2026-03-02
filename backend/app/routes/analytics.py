@@ -315,33 +315,66 @@ async def get_listings_performance(
 
     start_date = datetime.utcnow() - timedelta(days=days)
 
-    query = text("""
-        SELECT 
-            cl.id,
-            cl.title as name,
-            COALESCE(cl.images, '[]') as images,
-            cl.created_at as date_listed,
-            'Live' as status,
-            COUNT(DISTINCT il.id) as impressions,
-            COUNT(DISTINCT vl.id) as views,
-            CASE 
-                WHEN COUNT(DISTINCT il.id) > 0 
-                THEN ROUND(COUNT(DISTINCT vl.id) * 100.0 / COUNT(DISTINCT il.id), 1)
-                ELSE 0
-            END as ctr
-        FROM car_listings cl
-        LEFT JOIN impression_logs il ON il.listing_id = cl.id 
-            AND il.garage_id = :garage_id
-            AND il.created_at >= :start_date
-        LEFT JOIN view_logs vl ON vl.listing_id = cl.id 
-            AND vl.garage_id = :garage_id
-            AND vl.created_at >= :start_date
-        WHERE cl.garage_id = :garage_id
-        GROUP BY cl.id, cl.title, cl.images, cl.created_at
-        ORDER BY impressions DESC
-        OFFSET :skip
-        LIMIT :limit
-    """)
+    is_sqlite = DATABASE_URL.startswith('sqlite')
+    
+    if is_sqlite:
+        # SQLite syntax: LIMIT before OFFSET
+        query = text("""
+            SELECT 
+                cl.id,
+                cl.title as name,
+                COALESCE(cl.images, '[]') as images,
+                cl.created_at as date_listed,
+                'Live' as status,
+                COUNT(DISTINCT il.id) as impressions,
+                COUNT(DISTINCT vl.id) as views,
+                CASE 
+                    WHEN COUNT(DISTINCT il.id) > 0 
+                    THEN ROUND(COUNT(DISTINCT vl.id) * 100.0 / COUNT(DISTINCT il.id), 1)
+                    ELSE 0
+                END as ctr
+            FROM car_listings cl
+            LEFT JOIN impression_logs il ON il.listing_id = cl.id 
+                AND il.garage_id = :garage_id
+                AND il.created_at >= :start_date
+            LEFT JOIN view_logs vl ON vl.listing_id = cl.id 
+                AND vl.garage_id = :garage_id
+                AND vl.created_at >= :start_date
+            WHERE cl.garage_id = :garage_id
+            GROUP BY cl.id, cl.title, cl.images, cl.created_at
+            ORDER BY impressions DESC
+            LIMIT :limit
+            OFFSET :skip
+        """)
+    else:
+        # PostgreSQL syntax: OFFSET before LIMIT
+        query = text("""
+            SELECT 
+                cl.id,
+                cl.title as name,
+                COALESCE(cl.images, '[]') as images,
+                cl.created_at as date_listed,
+                'Live' as status,
+                COUNT(DISTINCT il.id) as impressions,
+                COUNT(DISTINCT vl.id) as views,
+                CASE 
+                    WHEN COUNT(DISTINCT il.id) > 0 
+                    THEN ROUND(COUNT(DISTINCT vl.id) * 100.0 / COUNT(DISTINCT il.id), 1)
+                    ELSE 0
+                END as ctr
+            FROM car_listings cl
+            LEFT JOIN impression_logs il ON il.listing_id = cl.id 
+                AND il.garage_id = :garage_id
+                AND il.created_at >= :start_date
+            LEFT JOIN view_logs vl ON vl.listing_id = cl.id 
+                AND vl.garage_id = :garage_id
+                AND vl.created_at >= :start_date
+            WHERE cl.garage_id = :garage_id
+            GROUP BY cl.id, cl.title, cl.images, cl.created_at
+            ORDER BY impressions DESC
+            OFFSET :skip
+            LIMIT :limit
+        """)
 
     result = await db.execute(
         query,

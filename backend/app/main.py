@@ -2,10 +2,28 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import search, listings, garages, search_advanced, admin, analytics
 from datetime import datetime
+from contextlib import asynccontextmanager
+from app.database import engine
+from app.models import Base
+from sqlalchemy import text
 
 # Analytics endpoints added for garage dashboard (2026-03-02)
 
-app = FastAPI(title="Car Prompt API", version="0.2.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: create database tables if they don't exist
+    print("Creating database tables if they don't exist...")
+    async with engine.begin() as conn:
+        # Enable pgvector extension for PostgreSQL
+        if str(engine.url).startswith('postgresql'):
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        await conn.run_sync(Base.metadata.create_all, checkfirst=True)
+    print("Database tables ready.")
+    yield
+    # Shutdown: close connections
+    await engine.dispose()
+
+app = FastAPI(title="Car Prompt API", version="0.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
