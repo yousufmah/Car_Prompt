@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes import search, listings, garages, search_advanced, admin, analytics
 from datetime import datetime
 
+# Analytics endpoints added for garage dashboard (2026-03-02)
+
 app = FastAPI(title="Car Prompt API", version="0.2.0")
 
 app.add_middleware(
