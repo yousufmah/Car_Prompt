@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from pydantic import BaseModel
 from app.database import get_db
-from app.models import CarListing, SearchLog
+from app.models import CarListing, SearchLog, ImpressionLog
 from app.ai import parse_prompt, get_embedding
 import json
 
@@ -100,6 +100,20 @@ async def search_cars(request: SearchRequest, db: AsyncSession = Depends(get_db)
         results_count=len(cars),
     )
     db.add(log)
+    # Flush to get the log ID for impression logging
+    await db.flush()
+
+    # 6. Log impressions for each car in results
+    for position, car in enumerate(cars, start=1):
+        if car.garage_id:
+            impression = ImpressionLog(
+                garage_id=car.garage_id,
+                listing_id=car.id,
+                search_id=log.id,
+                position=position,
+            )
+            db.add(impression)
+
     await db.commit()
 
     return {

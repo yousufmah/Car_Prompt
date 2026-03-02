@@ -59,3 +59,45 @@ class SearchLog(Base):
     parsed_filters = Column(Text)  # JSON
     results_count = Column(Integer)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ImpressionLog(Base):
+    __tablename__ = "impression_logs"
+
+    id = Column(Integer, primary_key=True)
+    garage_id = Column(Integer, ForeignKey("garages.id"), nullable=False)
+    listing_id = Column(Integer, ForeignKey("car_listings.id"))
+    search_id = Column(Integer, ForeignKey("search_logs.id"))
+    position = Column(Integer)  # Position in search results (1-indexed)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    garage = relationship("Garage")
+    listing = relationship("CarListing")
+    search = relationship("SearchLog")
+
+
+class ViewLog(Base):
+    __tablename__ = "view_logs"
+
+    id = Column(Integer, primary_key=True)
+    garage_id = Column(Integer, ForeignKey("garages.id"), nullable=False)
+    listing_id = Column(Integer, ForeignKey("car_listings.id"), nullable=False)
+    user_session = Column(String(255))  # Optional session identifier
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    garage = relationship("Garage")
+    listing = relationship("CarListing")
+
+
+class LeadLog(Base):
+    __tablename__ = "lead_logs"
+
+    id = Column(Integer, primary_key=True)
+    garage_id = Column(Integer, ForeignKey("garages.id"), nullable=False)
+    listing_id = Column(Integer, ForeignKey("car_listings.id"), nullable=False)
+    user_session = Column(String(255))
+    contact_method = Column(String(50))  # e.g., "phone", "email", "form"
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    garage = relationship("Garage")
+    listing = relationship("CarListing")

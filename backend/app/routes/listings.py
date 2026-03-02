@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
 from app.database import get_db
-from app.models import CarListing
+from app.models import CarListing, ViewLog
 from app.ai import get_embedding
 
 router = APIRouter()
@@ -48,6 +48,17 @@ async def get_listing(listing_id: int, db: AsyncSession = Depends(get_db)):
     listing = result.scalar_one_or_none()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
+    
+    # Log a view for analytics
+    if listing.garage_id:
+        view_log = ViewLog(
+            garage_id=listing.garage_id,
+            listing_id=listing.id,
+            user_session=None,  # TODO: Add session tracking
+        )
+        db.add(view_log)
+        await db.commit()
+    
     return listing
 
 
