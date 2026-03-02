@@ -9,11 +9,11 @@ from pydantic import BaseModel
 from typing import List, Optional
 import json
 
-from app.database import get_db
+from app.database import get_db, DATABASE_URL
 from app.models import Garage, CarListing, ImpressionLog, ViewLog, LeadLog
 
 # Set to True to return mock data for development
-USE_MOCK = True
+USE_MOCK = False
 
 router = APIRouter()
 
@@ -180,23 +180,41 @@ async def get_impressions_vs_views(
     if not garage:
         raise HTTPException(status_code=404, detail="Garage not found")
 
-    # Generate date series and aggregate
-    # Using SQL window functions to group by date
-    # For PostgreSQL, we can use date_trunc
-    query = text("""
-        SELECT 
-            date_trunc('day', created_at) as date,
-            COUNT(CASE WHEN log_type = 'impression' THEN 1 END) as impressions,
-            COUNT(CASE WHEN log_type = 'view' THEN 1 END) as views
-        FROM (
-            SELECT created_at, 'impression' as log_type FROM impression_logs WHERE garage_id = :garage_id
-            UNION ALL
-            SELECT created_at, 'view' as log_type FROM view_logs WHERE garage_id = :garage_id
-        ) combined_logs
-        WHERE created_at >= NOW() - INTERVAL ':days days'
-        GROUP BY date_trunc('day', created_at)
-        ORDER BY date
-    """)
+    # Determine dialect from DATABASE_URL
+    is_sqlite = DATABASE_URL.startswith('sqlite')
+
+    if is_sqlite:
+        # SQLite compatible query
+        query = text("""
+            SELECT 
+                date(created_at) as date,
+                COUNT(CASE WHEN log_type = 'impression' THEN 1 END) as impressions,
+                COUNT(CASE WHEN log_type = 'view' THEN 1 END) as views
+            FROM (
+                SELECT created_at, 'impression' as log_type FROM impression_logs WHERE garage_id = :garage_id
+                UNION ALL
+                SELECT created_at, 'view' as log_type FROM view_logs WHERE garage_id = :garage_id
+            ) combined_logs
+            WHERE created_at >= date('now', '-' || :days || ' days')
+            GROUP BY date(created_at)
+            ORDER BY date
+        """)
+    else:
+        # PostgreSQL query
+        query = text("""
+            SELECT 
+                date_trunc('day', created_at) as date,
+                COUNT(CASE WHEN log_type = 'impression' THEN 1 END) as impressions,
+                COUNT(CASE WHEN log_type = 'view' THEN 1 END) as views
+            FROM (
+                SELECT created_at, 'impression' as log_type FROM impression_logs WHERE garage_id = :garage_id
+                UNION ALL
+                SELECT created_at, 'view' as log_type FROM view_logs WHERE garage_id = :garage_id
+            ) combined_logs
+            WHERE created_at >= NOW() - INTERVAL ':days days'
+            GROUP BY date_trunc('day', created_at)
+            ORDER BY date
+        """)
 
     result = await db.execute(query, {"garage_id": garage_id, "days": days})
     rows = result.fetchall()
@@ -204,8 +222,12 @@ async def get_impressions_vs_views(
     # Format as list of DateMetric
     metrics = []
     for row in rows:
+        if isinstance(row.date, str):
+            date_str = row.date
+        else:
+            date_str = row.date.strftime("%Y-%m-%d")
         metrics.append(DateMetric(
-            date=row.date.strftime("%Y-%m-%d"),
+            date=date_str,
             impressions=row.impressions or 0,
             views=row.views or 0,
         ))

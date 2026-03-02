@@ -39,7 +39,12 @@ async def get_listings(
     result = await db.execute(
         select(CarListing).offset(skip).limit(limit).order_by(CarListing.created_at.desc())
     )
-    return result.scalars().all()
+    listings = result.scalars().all()
+    # Convert each listing to dict, excluding embedding column
+    return [
+        {c.name: getattr(listing, c.name) for c in listing.__table__.columns if c.name != 'embedding'}
+        for listing in listings
+    ]
 
 
 @router.get("/{listing_id}")
@@ -59,7 +64,9 @@ async def get_listing(listing_id: int, db: AsyncSession = Depends(get_db)):
         db.add(view_log)
         await db.commit()
     
-    return listing
+    # Convert to dict, excluding embedding column (non-serializable) and relationships
+    columns = listing.__table__.columns
+    return {c.name: getattr(listing, c.name) for c in columns if c.name != 'embedding'}
 
 
 @router.post("/")

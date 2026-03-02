@@ -215,8 +215,9 @@ MOCK_LISTINGS = [
 
 async def seed():
     async with engine.begin() as conn:
-        # Enable pgvector extension
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        # Enable pgvector extension (PostgreSQL only)
+        if DATABASE_URL.startswith('postgresql'):
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
 
         # Create tables
         from app.models import Base
