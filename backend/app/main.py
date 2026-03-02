@@ -1,3 +1,4 @@
+# Deployment trigger 2026-03-02 17:00 UTC
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import search, listings, garages, search_advanced, admin, analytics
