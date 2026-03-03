@@ -8,7 +8,7 @@ import json
 
 from app.database import get_db
 from app.search_engine import SearchEngine, simple_spell_correction
-from app.ai_improved import parse_prompt_improved, expand_query_with_similar_terms
+from app.ai import parse_prompt_improved, expand_query_with_similar_terms
 
 router = APIRouter()
 

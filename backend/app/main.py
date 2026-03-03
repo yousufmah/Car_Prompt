@@ -1,7 +1,7 @@
 # Deployment trigger 2026-03-02 17:00 UTC
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import search, listings, garages, search_advanced, admin, analytics
+from app.routes import search, listings, garages, search_advanced, admin, analytics, chat
 from datetime import datetime
 from contextlib import asynccontextmanager
 from app.database import engine
@@ -40,6 +40,7 @@ app.include_router(listings.router, prefix="/api/listings", tags=["listings"])
 app.include_router(garages.router, prefix="/api/garages", tags=["garages"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
+app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 
 
 @app.get("/")

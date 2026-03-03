@@ -96,11 +96,19 @@ Frontend runs at `http://localhost:3000`
 
 ## How It Works
 
+### Single‑Prompt Search
 1. User types a natural language prompt: *"Reliable Japanese car under £8k, good on fuel"*
-2. Backend sends it to GPT-4o-mini, which returns structured filters (make, price, fuel type, etc.)
+2. Backend sends it to GPT‑4o‑mini, which returns structured filters (make, price, fuel type, etc.)
 3. Those filters query the database
 4. If the prompt contains descriptive keywords, vector similarity search finds semantically relevant listings
 5. Results are ranked and returned
+
+### Conversational Search
+A new chat endpoint (`POST /api/chat/`) enables multi‑turn dialogue:
+- The AI assistant asks clarifying questions about budget, make, urgency, etc.
+- The conversation continues until enough information is gathered
+- Finally, structured filters are extracted and search results returned
+- See [CHAT_ENDPOINT.md](CHAT_ENDPOINT.md) for full documentation.
 
 ---
 
