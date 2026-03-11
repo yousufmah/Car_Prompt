@@ -37,9 +37,23 @@ class CarResult(BaseModel):
 @router.post("/")
 async def search_cars(request: SearchRequest, db: AsyncSession = Depends(get_db)):
     """Parse a natural language prompt and return matching cars."""
-
+    import numpy as np
+    
     # 1. Parse the prompt into filters
     filters = await parse_prompt(request.prompt)
+
+    # Determine if we need vector sorting
+    needs_vector_sorting = False
+    embedding = None
+    keywords = filters.get("keywords", [])
+    if keywords:
+        # Generate embedding from the prompt (or from keywords)
+        try:
+            embedding = await get_embedding(request.prompt)
+            needs_vector_sorting = True
+        except Exception as e:
+            print(f"Failed to generate embedding: {e}")
+            embedding = None
 
     # 2. Build the query
     conditions = []
@@ -65,35 +79,67 @@ async def search_cars(request: SearchRequest, db: AsyncSession = Depends(get_db)
     if body_types := filters.get("body_types"):
         conditions.append(CarListing.body_type.in_([b.lower() for b in body_types]))
 
+    # Select CarListing entity for vector search
     query = select(CarListing)
     if conditions:
         query = query.where(and_(*conditions))
 
-    # 3. If there are semantic keywords, also do vector search
+    # 3. Vector search disabled (pgvector extension unavailable)
     keywords = filters.get("keywords", [])
-    if keywords:
-        embedding = await get_embedding(" ".join(keywords))
-        # Order by vector similarity (closest first)
-        query = query.order_by(CarListing.embedding.cosine_distance(embedding))
-    else:
-        # Default sort
-        sort = filters.get("sort_by", "price_asc")
-        if sort == "price_asc":
-            query = query.order_by(CarListing.price.asc())
-        elif sort == "price_desc":
-            query = query.order_by(CarListing.price.desc())
-        elif sort == "year_desc":
-            query = query.order_by(CarListing.year.desc())
-        elif sort == "mileage_asc":
-            query = query.order_by(CarListing.mileage.asc())
+    # Keywords are ignored for vector sorting; they are already used in parsing
+    
+    # Default sort
+    sort = filters.get("sort_by", "price_asc")
+    if sort == "price_asc":
+        query = query.order_by(CarListing.price.asc())
+    elif sort == "price_desc":
+        query = query.order_by(CarListing.price.desc())
+    elif sort == "year_desc":
+        query = query.order_by(CarListing.year.desc())
+    elif sort == "mileage_asc":
+        query = query.order_by(CarListing.mileage.asc())
 
-    query = query.limit(20)
+    limit = 20
+    # Vector sorting enabled when we have embedding
+    if needs_vector_sorting and embedding is not None:
+        query = query.limit(limit * 3)  # fetch more for ranking
+    else:
+        query = query.limit(limit)
 
     # 4. Execute
     result = await db.execute(query)
     cars = result.scalars().all()
 
-    # 5. Log the search (this data is valuable)
+    # 5. If we need vector sorting, compute similarity and sort
+    if needs_vector_sorting and embedding is not None:
+        # Compute cosine similarity for each car
+        car_similarities = []
+        for car in cars:
+            if car.embedding:
+                # Ensure both are numpy arrays
+                vec1 = np.array(embedding)
+                vec2 = np.array(car.embedding)
+                if vec1.shape == vec2.shape:
+                    dot = np.dot(vec1, vec2)
+                    norm1 = np.linalg.norm(vec1)
+                    norm2 = np.linalg.norm(vec2)
+                    if norm1 > 0 and norm2 > 0:
+                        similarity = dot / (norm1 * norm2)
+                    else:
+                        similarity = 0.0
+                else:
+                    similarity = 0.0
+            else:
+                similarity = 0.0
+            car_similarities.append((similarity, car))
+        # Sort by similarity descending (higher similarity first)
+        car_similarities.sort(key=lambda x: x[0], reverse=True)
+        cars = [car for _, car in car_similarities[:limit]]
+    else:
+        # Already sorted by SQL
+        pass
+
+    # 6. Log the search (this data is valuable)
     log = SearchLog(
         user_prompt=request.prompt,
         parsed_filters=json.dumps(filters),
@@ -103,7 +149,7 @@ async def search_cars(request: SearchRequest, db: AsyncSession = Depends(get_db)
     # Flush to get the log ID for impression logging
     await db.flush()
 
-    # 6. Log impressions for each car in results
+    # 7. Log impressions for each car in results
     for position, car in enumerate(cars, start=1):
         if car.garage_id:
             impression = ImpressionLog(
