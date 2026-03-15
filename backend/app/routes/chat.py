@@ -1,22 +1,28 @@
 """Conversational car search endpoint."""
 
-from fastapi import APIRouter, Depends
+import json
+from typing import List, Dict, Any, Optional, Literal
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
-from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
-import json
+from pydantic import BaseModel, Field
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.database import get_db
 from app.models import CarListing, SearchLog, ImpressionLog
-from app.ai import chat_car_search, parse_prompt_improved, get_embedding
+from app.ai import chat_car_search, get_embedding
+from app.search_engine import build_filter_conditions, apply_sort_order, apply_vector_order
+
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter()
 
 
 class ChatMessage(BaseModel):
-    role: str  # "user" or "assistant"
-    content: str
+    role: Literal["user", "assistant"]
+    content: str = Field(..., max_length=2000)
 
 
 class ChatRequest(BaseModel):
@@ -51,29 +57,8 @@ class ChatResponse(BaseModel):
 
 
 async def _search_with_filters(filters: Dict[str, Any], db: AsyncSession):
-    """Perform search using filters (copied from search.py)."""
-    conditions = []
-
-    if makes := filters.get("makes"):
-        conditions.append(CarListing.make.in_([m.lower() for m in makes]))
-    if models := filters.get("models"):
-        conditions.append(CarListing.model.in_([m.lower() for m in models]))
-    if min_year := filters.get("min_year"):
-        conditions.append(CarListing.year >= min_year)
-    if max_year := filters.get("max_year"):
-        conditions.append(CarListing.year <= max_year)
-    if min_price := filters.get("min_price"):
-        conditions.append(CarListing.price >= min_price)
-    if max_price := filters.get("max_price"):
-        conditions.append(CarListing.price <= max_price)
-    if max_mileage := filters.get("max_mileage"):
-        conditions.append(CarListing.mileage <= max_mileage)
-    if fuel_types := filters.get("fuel_types"):
-        conditions.append(CarListing.fuel_type.in_([f.lower() for f in fuel_types]))
-    if transmissions := filters.get("transmissions"):
-        conditions.append(CarListing.transmission.in_([t.lower() for t in transmissions]))
-    if body_types := filters.get("body_types"):
-        conditions.append(CarListing.body_type.in_([b.lower() for b in body_types]))
+    """Perform search using shared filter builder."""
+    conditions = build_filter_conditions(filters)
 
     query = select(CarListing)
     if conditions:
@@ -82,20 +67,17 @@ async def _search_with_filters(filters: Dict[str, Any], db: AsyncSession):
     # If there are semantic keywords, also do vector search
     keywords = filters.get("keywords", [])
     if keywords:
-        embedding = await get_embedding(" ".join(keywords))
-        # Order by vector similarity (closest first)
-        query = query.order_by(CarListing.embedding.cosine_distance(embedding))
+        try:
+            embedding = await get_embedding(" ".join(keywords))
+            has_real_embedding = any(v != 0.0 for v in embedding[:10])
+            if has_real_embedding:
+                query = apply_vector_order(query, embedding)
+            else:
+                query = apply_sort_order(query, filters)
+        except Exception:
+            query = apply_sort_order(query, filters)
     else:
-        # Default sort
-        sort = filters.get("sort_by", "price_asc")
-        if sort == "price_asc":
-            query = query.order_by(CarListing.price.asc())
-        elif sort == "price_desc":
-            query = query.order_by(CarListing.price.desc())
-        elif sort == "year_desc":
-            query = query.order_by(CarListing.year.desc())
-        elif sort == "mileage_asc":
-            query = query.order_by(CarListing.mileage.asc())
+        query = apply_sort_order(query, filters)
 
     query = query.limit(20)
 
@@ -104,72 +86,95 @@ async def _search_with_filters(filters: Dict[str, Any], db: AsyncSession):
     return cars
 
 
+async def _log_chat_search(
+    prompt: str,
+    filters: dict,
+    cars_data: list[dict],
+    db: AsyncSession,
+):
+    """Background task: log chat search and impressions."""
+    log = SearchLog(
+        user_prompt=prompt,
+        parsed_filters=json.dumps(filters),
+        results_count=len(cars_data),
+    )
+    db.add(log)
+    await db.flush()
+
+    for item in cars_data:
+        if item.get("garage_id"):
+            impression = ImpressionLog(
+                garage_id=item["garage_id"],
+                listing_id=item["id"],
+                search_id=log.id,
+                position=item["position"],
+            )
+            db.add(impression)
+
+    await db.commit()
+
+
 @router.post("/", response_model=ChatResponse)
-async def chat_search(request: ChatRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("30/minute")
+async def chat_search(
+    chat_request: ChatRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
     """
     Conversational car search.
-    
+
     Takes a conversation history and returns either a clarifying question
     or search results with matching cars.
     """
     # Convert messages to list of dicts for AI module
-    messages = [{"role": msg.role, "content": msg.content} for msg in request.messages]
-    
+    messages = [{"role": msg.role, "content": msg.content} for msg in chat_request.messages]
+
     # Call chat AI
     chat_result = await chat_car_search(messages)
-    
+
     if chat_result["type"] == "response":
-        # Just return the assistant's response
         return ChatResponse(
             type="response",
             assistant_message=chat_result["content"],
             filters=None,
             results=None,
-            count=None
+            count=None,
         )
-    
+
     # Otherwise we have filters, perform search
     filters = chat_result["filters"]
-    
-    # Log the search (using the last user message as prompt)
+
+    # Get last user message for logging
     last_user_message = next(
         (msg["content"] for msg in reversed(messages) if msg["role"] == "user"),
-        ""
+        "",
     )
-    log = SearchLog(
-        user_prompt=last_user_message,
-        parsed_filters=json.dumps(filters),
-        results_count=0  # will update after search
-    )
-    db.add(log)
-    await db.flush()
-    
+
     # Perform search
     cars = await _search_with_filters(filters, db)
-    
-    # Update log with result count
-    log.results_count = len(cars)
-    
-    # Log impressions
-    for position, car in enumerate(cars, start=1):
-        if car.garage_id:
-            impression = ImpressionLog(
-                garage_id=car.garage_id,
-                listing_id=car.id,
-                search_id=log.id,
-                position=position,
-            )
-            db.add(impression)
-    
-    await db.commit()
-    
+
     # Convert cars to result objects
     results = [CarResult.from_orm(car) for car in cars]
-    
+
+    # Schedule logging as a background task
+    cars_data = [
+        {"id": car.id, "garage_id": car.garage_id, "position": pos}
+        for pos, car in enumerate(cars, start=1)
+    ]
+    background_tasks.add_task(
+        _log_chat_search,
+        last_user_message,
+        filters,
+        cars_data,
+        db,
+    )
+
     return ChatResponse(
         type="search",
         assistant_message="Here are some cars that match your criteria:",
         filters=filters,
         results=results,
-        count=len(results)
+        count=len(results),
     )

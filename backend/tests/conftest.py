@@ -1,5 +1,5 @@
 import pytest
-from fastapi.testclient import TestClient
+from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import StaticPool
 import asyncio
@@ -27,36 +27,30 @@ async def override_get_db():
         yield session
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+import pytest_asyncio
 
-
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 async def db_session():
     """Create a fresh database session for a test."""
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
+
     async with TestingSessionLocal() as session:
         yield session
-    
+
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
 
-@pytest.fixture(scope="function")
-def test_client(db_session):
-    """Create a test client with overridden database dependency."""
-    app.dependency_overrides[get_db] = lambda: db_session
-    
+@pytest_asyncio.fixture(scope="function")
+async def test_client(db_session):
+    """Create an async test client with overridden database dependency."""
+    app.dependency_overrides[get_db] = override_get_db
+
     # Mock the AI functions to avoid OpenAI API calls
     with patch("app.ai.parse_prompt", new_callable=AsyncMock) as mock_parse, \
          patch("app.ai.get_embedding", new_callable=AsyncMock) as mock_embed:
-        
+
         # Setup default mock responses
         mock_parse.return_value = {
             "makes": [],
@@ -71,12 +65,13 @@ def test_client(db_session):
             "body_types": [],
             "min_doors": None,
             "keywords": [],
-            "sort_by": "price_asc"
+            "sort_by": "price_asc",
         }
-        
+
         mock_embed.return_value = [0.0] * 1536  # Mock embedding vector
-        
-        with TestClient(app) as client:
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
             yield client
-    
+
     app.dependency_overrides.clear()
